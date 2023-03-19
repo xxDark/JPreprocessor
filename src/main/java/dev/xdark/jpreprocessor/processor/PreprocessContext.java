@@ -4,17 +4,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 final class PreprocessContext {
-    final StringBuilder output;
     final Map<String, MacroDerivative> derivatives;
     final StringBuilder tmp = new StringBuilder();
     boolean child;
 
-    PreprocessContext(StringBuilder output, Map<String, MacroDerivative> derivatives) {
-        this.output = output;
+    PreprocessContext(Map<String, MacroDerivative> derivatives) {
         this.derivatives = derivatives;
     }
 
     PreprocessContext() {
-        this(new StringBuilder(), new HashMap<>());
+        this(new HashMap<>());
     }
 }

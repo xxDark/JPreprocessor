@@ -6,10 +6,22 @@ public class StringReader {
     private static final char SYNTAX_SINGLE_QUOTE = '\'';
 
     private final String string;
+    private final int limit;
     private int cursor;
 
-    public StringReader(String string) {
+    public StringReader(String string, int limit) {
         this.string = string;
+        this.limit = limit;
+    }
+
+    public StringReader(String string) {
+        this(string, string.length());
+    }
+
+    public StringReader copy(int start, int end) {
+        StringReader reader = new StringReader(string, end);
+        reader.cursor = start;
+        return reader;
     }
 
     public String getString() {
@@ -20,8 +32,12 @@ public class StringReader {
         return cursor;
     }
 
+    public void setCursor(int cursor) {
+        this.cursor = cursor;
+    }
+
     public boolean canRead(int length) {
-        return cursor + length <= string.length();
+        return cursor + length <= limit;
     }
 
     public boolean canRead() {
@@ -86,7 +102,18 @@ public class StringReader {
     }
 
     public boolean matches(String text) {
-        return string.regionMatches(cursor, text, 0, text.length());
+        int left = limit - cursor;
+        int length = text.length();
+        if (left <= length) {
+            return false;
+        }
+        return string.regionMatches(cursor, text, 0, length);
+    }
+
+    public void skipUnquotedString() {
+        while (canRead() && isAllowedInUnquotedString(peek())) {
+            skip();
+        }
     }
 
     public String readUnquotedString() {

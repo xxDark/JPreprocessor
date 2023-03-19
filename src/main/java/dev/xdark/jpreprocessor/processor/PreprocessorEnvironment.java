@@ -1,5 +1,6 @@
 package dev.xdark.jpreprocessor.processor;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -10,7 +11,12 @@ public class PreprocessorEnvironment {
         Map<String, MacroDerivative> derivatives = ctx.derivatives;
         if (!derivatives.containsKey(UNDEF)) {
             derivatives.put(UNDEF, (context, reader, output) -> {
-                List<String> args = JavaPreprocessor.extractArguments(reader);
+                List<String> args;
+                try {
+                    args = JavaPreprocessor.extractArguments(reader);
+                } catch (IOException ex) {
+                    throw new RuntimeException(ex);
+                }
                 if (args.size() != 1) {
                     throw new IllegalStateException("Bad call to undef");
                 }
