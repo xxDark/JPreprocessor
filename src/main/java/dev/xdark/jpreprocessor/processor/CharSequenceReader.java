@@ -109,7 +109,7 @@ public final class CharSequenceReader {
         }
         CharSequence cs = this.cs;
         if (cs instanceof String) {
-            return ((String) cs).regionMatches(cursor, text, 0, left);
+            return ((String) cs).regionMatches(cursor, text, 0, length);
         }
         int off = 0;
         while (left-- != 0) {
