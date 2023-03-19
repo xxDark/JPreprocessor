@@ -8,7 +8,7 @@ public class PreprocessorEnvironment {
     private static final String UNDEF = "undef";
 
     static void initBuiltins(PreprocessContext ctx) {
-        Map<String, MacroDerivative> derivatives = ctx.derivatives;
+        Map<String, MacroDirective> derivatives = ctx.derivatives;
         if (!derivatives.containsKey(UNDEF)) {
             derivatives.put(UNDEF, (context, reader, output) -> {
                 List<String> args;

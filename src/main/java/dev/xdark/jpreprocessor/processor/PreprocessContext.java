@@ -4,11 +4,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 final class PreprocessContext {
-    final Map<String, MacroDerivative> derivatives;
+    final Map<String, MacroDirective> derivatives;
     final StringBuilder tmp = new StringBuilder();
     boolean child;
 
-    PreprocessContext(Map<String, MacroDerivative> derivatives) {
+    PreprocessContext(Map<String, MacroDirective> derivatives) {
         this.derivatives = derivatives;
     }
 

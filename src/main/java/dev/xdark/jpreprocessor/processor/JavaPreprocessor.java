@@ -5,7 +5,7 @@ import java.util.*;
 
 @SuppressWarnings({"DuplicatedCode"})
 public final class JavaPreprocessor {
-    private static final MacroDerivative EMPTY = (ctx, input, output) -> {
+    private static final MacroDirective EMPTY = (ctx, input, output) -> {
     };
     private static final Appendable NULL_APPENDABLE = new Appendable() {
         @Override
@@ -109,7 +109,7 @@ public final class JavaPreprocessor {
                                         $args.set(i, tmp.toString());
                                     }
                                     tmp.setLength(0);
-                                    Map<String, MacroDerivative> copy = new HashMap<>(_ctx.derivatives);
+                                    Map<String, MacroDirective> copy = new HashMap<>(_ctx.derivatives);
                                     fork = touch(new PreprocessContext(copy));
                                     for (int i = 0; i < len; i++) {
                                         String key = list.get(i);
@@ -136,9 +136,9 @@ public final class JavaPreprocessor {
                     if (cursor > 0) {
                         if (!Character.isWhitespace(reader.peek(-1))) {
                             String macro = reader.readUnquotedString();
-                            MacroDerivative derivative = ctx.derivatives.get(macro);
+                            MacroDirective derivative = ctx.derivatives.get(macro);
                             if (derivative != null) {
-                                Map<String, MacroDerivative> copy = new HashMap<>(ctx.derivatives);
+                                Map<String, MacroDirective> copy = new HashMap<>(ctx.derivatives);
                                 int end = reader.getCursor();
                                 consumer.macroPrefix(cursor, end, output -> {
                                     PreprocessContext _ctx = new PreprocessContext(copy);
@@ -169,12 +169,12 @@ public final class JavaPreprocessor {
         }
         cursor = reader.getCursor();
         String name = reader.getString().substring(cursor + offset + 1, cursor - 1);
-        MacroDerivative derivative = ctx.derivatives.get(name);
+        MacroDirective derivative = ctx.derivatives.get(name);
         if (derivative == null) {
             consumer.append('!');
             return;
         }
-        Map<String, MacroDerivative> copy = new HashMap<>(ctx.derivatives);
+        Map<String, MacroDirective> copy = new HashMap<>(ctx.derivatives);
         int $cursor = cursor;
         // Look ahead
         reader.skipWhitespace();
