@@ -4,5 +4,5 @@ import java.io.IOException;
 
 public interface MacroDirective {
 
-    void expand(PreprocessContext ctx, StringReader reader, Appendable output) throws IOException;
+    void expand(PreprocessContext ctx, CharSequenceReader reader, Appendable output) throws IOException;
 }

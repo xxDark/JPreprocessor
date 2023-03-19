@@ -1,31 +1,30 @@
 package dev.xdark.jpreprocessor.processor;
 
-public class StringReader {
-    private static final char SYNTAX_ESCAPE = '\\';
+public final class CharSequenceReader {
     private static final char SYNTAX_DOUBLE_QUOTE = '"';
     private static final char SYNTAX_SINGLE_QUOTE = '\'';
 
-    private final String string;
+    private final CharSequence cs;
     private final int limit;
     private int cursor;
 
-    public StringReader(String string, int limit) {
-        this.string = string;
+    public CharSequenceReader(CharSequence cs, int limit) {
+        this.cs = cs;
         this.limit = limit;
     }
 
-    public StringReader(String string) {
-        this(string, string.length());
+    public CharSequenceReader(CharSequence cs) {
+        this(cs, cs.length());
     }
 
-    public StringReader copy(int start, int end) {
-        StringReader reader = new StringReader(string, end);
+    public CharSequenceReader copy(int start, int end) {
+        CharSequenceReader reader = new CharSequenceReader(cs, end);
         reader.cursor = start;
         return reader;
     }
 
-    public String getString() {
-        return string;
+    public CharSequence source() {
+        return cs;
     }
 
     public int getCursor() {
@@ -45,15 +44,15 @@ public class StringReader {
     }
 
     public char peek() {
-        return string.charAt(cursor);
+        return cs.charAt(cursor);
     }
 
     public char peek(int offset) {
-        return string.charAt(cursor + offset);
+        return cs.charAt(cursor + offset);
     }
 
     public char read() {
-        return string.charAt(cursor++);
+        return cs.charAt(cursor++);
     }
 
     public void skip() {
@@ -102,51 +101,31 @@ public class StringReader {
     }
 
     public boolean matches(String text) {
+        int cursor = this.cursor;
         int left = limit - cursor;
         int length = text.length();
         if (left <= length) {
             return false;
         }
-        return string.regionMatches(cursor, text, 0, length);
-    }
-
-    public void skipUnquotedString() {
-        while (canRead() && isAllowedInUnquotedString(peek())) {
-            skip();
+        CharSequence cs = this.cs;
+        if (cs instanceof String) {
+            return ((String) cs).regionMatches(cursor, text, 0, left);
         }
+        int off = 0;
+        while (left-- != 0) {
+            if (cs.charAt(cursor++) != text.charAt(off++)) {
+                return false;
+            }
+        }
+        return true;
     }
 
-    public String readUnquotedString() {
+    public CharSequence readUnquoted() {
         final int start = cursor;
         while (canRead() && isAllowedInUnquotedString(peek())) {
             skip();
         }
-        return string.substring(start, cursor);
-    }
-
-    public String readStringUntil(char terminator) {
-        StringBuilder result = new StringBuilder();
-        boolean escaped = false;
-        while (canRead()) {
-            char c = read();
-            if (escaped) {
-                if (c == terminator || c == SYNTAX_ESCAPE) {
-                    result.append(c);
-                    escaped = false;
-                } else {
-                    cursor--;
-                    throw new IllegalStateException("Invalid escape " + c);
-                }
-            } else if (c == SYNTAX_ESCAPE) {
-                escaped = true;
-            } else if (c == terminator) {
-                return result.toString();
-            } else {
-                result.append(c);
-            }
-        }
-
-        throw new IllegalStateException("String falls through");
+        return cs.subSequence(start, cursor);
     }
 
     public void expect(char c) {

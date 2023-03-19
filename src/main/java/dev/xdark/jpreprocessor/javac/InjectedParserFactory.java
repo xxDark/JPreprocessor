@@ -22,6 +22,6 @@ public final class InjectedParserFactory extends ParserFactory {
     }
 
     private static CharSequence preprocess(CharSequence cs) {
-        return JavaPreprocessor.process(cs.toString());
+        return JavaPreprocessor.process(cs);
     }
 }

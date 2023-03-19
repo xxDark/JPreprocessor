@@ -27,7 +27,7 @@ public final class JavaPreprocessor {
     private JavaPreprocessor() {
     }
 
-    public static String process(String input) {
+    public static String process(CharSequence input) {
         StringBuilder builder = new StringBuilder(input.length());
         try {
             process(input, dumper(builder));
@@ -37,12 +37,12 @@ public final class JavaPreprocessor {
         return builder.toString();
     }
 
-    public static void process(String input, PreprocessorConsumer consumer) throws IOException {
+    public static void process(CharSequence input, PreprocessorConsumer consumer) throws IOException {
         PreprocessContext ctx = touch(new PreprocessContext());
-        processImpl(ctx, new StringReader(input), consumer);
+        processImpl(ctx, new CharSequenceReader(input), consumer);
     }
 
-    private static void processImpl(PreprocessContext ctx, StringReader reader, PreprocessorConsumer consumer) throws IOException {
+    private static void processImpl(PreprocessContext ctx, CharSequenceReader reader, PreprocessorConsumer consumer) throws IOException {
         while (reader.canRead()) {
             char c = reader.read();
             if (c == '#') {
@@ -51,7 +51,7 @@ public final class JavaPreprocessor {
                         int start = reader.getCursor();
                         reader.skip(6);
                         reader.skipWhitespace();
-                        String name = reader.readUnquotedString();
+                        String name = reader.readUnquoted().toString();
                         String eol = reader.skipEOL();
                         if (eol != null) {
                             ctx.derivatives.put(name, EMPTY);
@@ -105,7 +105,7 @@ public final class JavaPreprocessor {
                                     fork.child = true;
                                     for (int i = 0; i < len; i++) {
                                         tmp.setLength(0);
-                                        processImpl(fork, new StringReader($args.get(i)), dumper);
+                                        processImpl(fork, new CharSequenceReader($args.get(i)), dumper);
                                         $args.set(i, tmp.toString());
                                     }
                                     tmp.setLength(0);
@@ -119,7 +119,7 @@ public final class JavaPreprocessor {
                                         });
                                     }
                                     fork.child = true;
-                                    processImpl(fork, new StringReader((String) insert), dumper(tmp));
+                                    processImpl(fork, new CharSequenceReader(insert), dumper(tmp));
                                     insert = tmp;
                                 }
                                 output.append(insert);
@@ -135,14 +135,14 @@ public final class JavaPreprocessor {
                     int cursor = reader.getCursor();
                     if (cursor > 0) {
                         if (!Character.isWhitespace(reader.peek(-1))) {
-                            String macro = reader.readUnquotedString();
+                            String macro = reader.readUnquoted().toString();
                             MacroDirective derivative = ctx.derivatives.get(macro);
                             if (derivative != null) {
                                 Map<String, MacroDirective> copy = new HashMap<>(ctx.derivatives);
                                 int end = reader.getCursor();
                                 consumer.macroPrefix(cursor, end, output -> {
                                     PreprocessContext _ctx = new PreprocessContext(copy);
-                                    StringReader _reader = reader.copy(cursor, end);
+                                    CharSequenceReader _reader = reader.copy(cursor, end);
                                     derivative.expand(_ctx, _reader, output);
                                 });
                             }
@@ -157,7 +157,7 @@ public final class JavaPreprocessor {
         }
     }
 
-    private static void processMacro(PreprocessContext ctx, StringReader reader, PreprocessorConsumer consumer) throws IOException {
+    private static void processMacro(PreprocessContext ctx, CharSequenceReader reader, PreprocessorConsumer consumer) throws IOException {
         int cursor = reader.getCursor();
         int offset = -2;
         while (cursor-- > 1) {
@@ -168,7 +168,7 @@ public final class JavaPreprocessor {
             offset--;
         }
         cursor = reader.getCursor();
-        String name = reader.getString().substring(cursor + offset + 1, cursor - 1);
+        String name = reader.source().subSequence(cursor + offset + 1, cursor - 1).toString();
         MacroDirective derivative = ctx.derivatives.get(name);
         if (derivative == null) {
             consumer.append('!');
@@ -185,12 +185,12 @@ public final class JavaPreprocessor {
         consumer.advance(-name.length());
         consumer.macroSuffix(cursor, end, output -> {
             PreprocessContext _ctx = new PreprocessContext(copy);
-            StringReader _reader = reader.copy($cursor, end);
+            CharSequenceReader _reader = reader.copy($cursor, end);
             derivative.expand(_ctx, _reader, output);
         });
     }
 
-    private static void processCode(StringReader reader, Appendable appendable, char c) throws IOException {
+    private static void processCode(CharSequenceReader reader, Appendable appendable, char c) throws IOException {
         switch (c) {
             case '/': {
                 if (reader.canRead(1)) {
@@ -251,7 +251,7 @@ public final class JavaPreprocessor {
         }
     }
 
-    static void skipArguments(StringReader input) throws IOException {
+    static void skipArguments(CharSequenceReader input) throws IOException {
         int callDepth = 0;
         input.expect('(');
         input.skipWhitespace();
@@ -272,7 +272,7 @@ public final class JavaPreprocessor {
         }
     }
 
-    static List<String> extractArguments(StringReader input) throws IOException {
+    static List<String> extractArguments(CharSequenceReader input) throws IOException {
         List<String> arguments = new ArrayList<>();
 
         int callDepth = 0;
