@@ -20,84 +20,85 @@ public final class JavaPreprocessor {
         while (reader.canRead()) {
             char c = reader.read();
             if (c == '#') {
-                if (!ctx.child && reader.matches("define")) {
-
-                    reader.skip(6);
-                    reader.skipWhitespace();
-                    String name = reader.readUnquotedString();
-                    String eol = reader.skipEOL();
-                    if (eol != null) {
-                        ctx.derivatives.put(name, EMPTY);
-                        output.append(eol);
-                    } else {
-                        List<String> args;
-                        if (reader.peek() == '(') {
-                            args = extractArguments(reader);
+                if (!ctx.child) {
+                    if (reader.matches("define")) {
+                        reader.skip(6);
+                        reader.skipWhitespace();
+                        String name = reader.readUnquotedString();
+                        String eol = reader.skipEOL();
+                        if (eol != null) {
+                            ctx.derivatives.put(name, EMPTY);
+                            output.append(eol);
                         } else {
-                            if (Character.isWhitespace(reader.peek())) {
-                                reader.skip();
-                            }
-                            args = Collections.emptyList();
-                        }
-                        StringBuilder code = ctx.tmp;
-                        code.setLength(0);
-                        while (reader.canRead()) {
-                            c = reader.read();
-                            if (c == '\n') {
-                                int offset = -1;
-                                if (reader.peek(offset) == '\r') {
-                                    offset = -2;
-                                }
-                                if (reader.peek(offset) == '\\') {
-                                    if (offset == -2) {
-                                        code.append('\r');
-                                    }
-                                    code.append('\n');
-                                } else {
-                                    reader.skip(offset);
-                                    break;
-                                }
+                            List<String> args;
+                            if (reader.peek() == '(') {
+                                args = extractArguments(reader);
                             } else {
-                                code.append(c);
-                            }
-                        }
-                        String result = code.toString();
-                        ctx.derivatives.put(name, (_ctx, input, builder) -> {
-                            String insert = result;
-                            List<String> list = args;
-                            int len = list.size();
-                            if (len != 0) {
-                                input.skipWhitespace();
-                                List<String> $args = extractArguments(input);
-                                if (len != $args.size()) {
-                                    throw new IllegalStateException("Mismatched argument length");
+                                if (Character.isWhitespace(reader.peek())) {
+                                    reader.skip();
                                 }
-                                StringBuilder tmp = _ctx.tmp;
-                                PreprocessContext fork = touch(new PreprocessContext(tmp, ctx.derivatives));
-                                fork.child = true;
-                                for (int i = 0; i < len; i++) {
+                                args = Collections.emptyList();
+                            }
+                            StringBuilder code = ctx.tmp;
+                            code.setLength(0);
+                            while (reader.canRead()) {
+                                c = reader.read();
+                                if (c == '\n') {
+                                    int offset = -1;
+                                    if (reader.peek(offset) == '\r') {
+                                        offset = -2;
+                                    }
+                                    if (reader.peek(offset) == '\\') {
+                                        if (offset == -2) {
+                                            code.append('\r');
+                                        }
+                                        code.append('\n');
+                                    } else {
+                                        reader.skip(offset);
+                                        break;
+                                    }
+                                } else {
+                                    code.append(c);
+                                }
+                            }
+                            String result = code.toString();
+                            ctx.derivatives.put(name, (_ctx, input, builder) -> {
+                                String insert = result;
+                                List<String> list = args;
+                                int len = list.size();
+                                if (len != 0) {
+                                    input.skipWhitespace();
+                                    List<String> $args = extractArguments(input);
+                                    if (len != $args.size()) {
+                                        throw new IllegalStateException("Mismatched argument length");
+                                    }
+                                    StringBuilder tmp = _ctx.tmp;
+                                    PreprocessContext fork = touch(new PreprocessContext(tmp, ctx.derivatives));
+                                    fork.child = true;
+                                    for (int i = 0; i < len; i++) {
+                                        tmp.setLength(0);
+                                        processImpl(fork, new StringReader($args.get(i)));
+                                        $args.set(i, tmp.toString());
+                                    }
                                     tmp.setLength(0);
-                                    processImpl(fork, new StringReader($args.get(i)));
-                                    $args.set(i, tmp.toString());
+                                    Map<String, MacroDerivative> copy = new HashMap<>(ctx.derivatives);
+                                    fork = touch(new PreprocessContext(tmp, copy));
+                                    for (int i = 0; i < len; i++) {
+                                        String key = list.get(i);
+                                        String s = $args.get(i);
+                                        copy.put(key, (__, ____, os) -> {
+                                            os.append(s);
+                                        });
+                                    }
+                                    fork.child = true;
+                                    processImpl(fork, new StringReader(insert));
+                                    insert = tmp.toString();
                                 }
-                                tmp.setLength(0);
-                                Map<String, MacroDerivative> copy = new HashMap<>(ctx.derivatives);
-                                fork = touch(new PreprocessContext(tmp, copy));
-                                for (int i = 0; i < len; i++) {
-                                    String key = list.get(i);
-                                    String s = $args.get(i);
-                                    copy.put(key, (__, ____, os) -> {
-                                        os.append(s);
-                                    });
-                                }
-                                fork.child = true;
-                                processImpl(fork, new StringReader(insert));
-                                insert = tmp.toString();
-                            }
-                            builder.append(insert);
-                        });
+                                builder.append(insert);
+                            });
+                        }
+                        continue;
                     }
-                    continue;
                 }
                 int cursor = reader.getCursor();
                 if (cursor > 0) {
