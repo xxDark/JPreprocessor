@@ -69,23 +69,35 @@ public final class JavaPreprocessor {
                             StringBuilder code = ctx.tmp;
                             code.setLength(0);
                             while (reader.canRead()) {
-                                c = reader.read();
-                                if (c == '\n') {
-                                    int offset = -1;
-                                    if (reader.peek(offset) == '\r') {
-                                        offset = -2;
-                                    }
-                                    if (reader.peek(offset) == '\\') {
-                                        if (offset == -2) {
-                                            code.append('\r');
+                                char p = reader.peek();
+                                if (p == '\n' || !Character.isWhitespace(p)) {
+                                    break;
+                                }
+                                reader.skip();
+                            }
+                            if (reader.canRead()) {
+                                if (reader.peek() == '{') {
+                                    reader.skip();
+                                    int bracketDepth = 1;
+                                    do {
+                                        c = reader.read();
+                                        if (c == '{') {
+                                            bracketDepth++;
+                                        } else if (c == '}') {
+                                            if (--bracketDepth == 0) {
+                                                break;
+                                            }
                                         }
-                                        code.append('\n');
-                                    } else {
-                                        reader.skip(offset);
-                                        break;
-                                    }
+                                        code.append(c);
+                                    } while (reader.canRead());
                                 } else {
-                                    code.append(c);
+                                    do {
+                                        c = reader.read();
+                                        if (c == '\n') {
+                                            break;
+                                        }
+                                        processCode(reader, code, c);
+                                    } while (reader.canRead());
                                 }
                             }
                             String result = code.toString();
