@@ -228,7 +228,7 @@ public final class JavaPreprocessor {
                     break;
                 }
             }
-            if (c == ',') {
+            if (c == ',' && callDepth == 0) {
                 arguments.add(argument.toString().trim());
                 argument.setLength(0);
                 input.skipWhitespace();
@@ -243,7 +243,6 @@ public final class JavaPreprocessor {
 
         return arguments;
     }
-
     private static PreprocessContext touch(PreprocessContext ctx) {
         PreprocessorEnvironment.initBuiltins(ctx);
         return ctx;
