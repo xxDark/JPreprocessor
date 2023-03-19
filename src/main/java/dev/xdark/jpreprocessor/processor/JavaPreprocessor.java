@@ -38,7 +38,8 @@ public final class JavaPreprocessor {
     }
 
     public static void process(CharSequence input, PreprocessorConsumer consumer) throws IOException {
-        PreprocessContext ctx = touch(new PreprocessContext());
+        PreprocessContext ctx = new PreprocessContext();
+        PreprocessorEnvironment.initBuiltins(ctx);
         processImpl(ctx, new CharSequenceReader(input), consumer);
     }
 
@@ -112,7 +113,7 @@ public final class JavaPreprocessor {
                                         throw new IllegalStateException("Mismatched argument length");
                                     }
                                     StringBuilder tmp = _ctx.tmp;
-                                    PreprocessContext fork = touch(new PreprocessContext(_ctx.derivatives));
+                                    PreprocessContext fork = new PreprocessContext(_ctx.derivatives);
                                     PreprocessorConsumer dumper = dumper(tmp);
                                     fork.child = true;
                                     for (int i = 0; i < len; i++) {
@@ -122,7 +123,7 @@ public final class JavaPreprocessor {
                                     }
                                     tmp.setLength(0);
                                     Map<String, MacroDirective> copy = new HashMap<>(_ctx.derivatives);
-                                    fork = touch(new PreprocessContext(copy));
+                                    fork = new PreprocessContext(copy);
                                     for (int i = 0; i < len; i++) {
                                         String key = list.get(i);
                                         String s = $args.get(i);
@@ -314,11 +315,6 @@ public final class JavaPreprocessor {
         }
 
         return arguments;
-    }
-
-    private static PreprocessContext touch(PreprocessContext ctx) {
-        PreprocessorEnvironment.initBuiltins(ctx);
-        return ctx;
     }
 
     private static PreprocessorConsumer dumper(StringBuilder builder) {
