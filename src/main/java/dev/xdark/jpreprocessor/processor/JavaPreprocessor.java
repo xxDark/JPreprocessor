@@ -32,25 +32,7 @@ public final class JavaPreprocessor {
                     } else {
                         List<String> args;
                         if (reader.peek() == '(') {
-                            args = new ArrayList<>();
-                            reader.skip();
-                            StringBuilder tmp = ctx.tmp;
-                            tmp.setLength(0);
-                            while (true) {
-                                c = reader.read();
-                                if (c == ',') {
-                                    args.add(tmp.toString());
-                                    tmp.setLength(0);
-                                    continue;
-                                } else if (c == ')') {
-                                    args.add(tmp.toString());
-                                    if (reader.canRead() && reader.peek() == ' ') {
-                                        reader.skip();
-                                    }
-                                    break;
-                                }
-                                tmp.append(c);
-                            }
+                            args = extractArguments(reader);
                         } else {
                             if (Character.isWhitespace(reader.peek())) {
                                 reader.skip();
@@ -207,48 +189,14 @@ public final class JavaPreprocessor {
                     }
                     if (c == '\\') {
                         skip = true;
-                    } else if (c != end) {
-                        throw new IllegalStateException("Did not end string sequence");
+                    } else if (c == end) {
+                        return;
                     }
                 }
-                break;
+                throw new IllegalStateException("Did not end string sequence");
             }
             default:
                 output.append(c);
-        }
-    }
-
-    private static void skipComments(StringReader reader, StringBuilder output, char c) {
-        if (c == '/') {
-            if (reader.canRead(1)) {
-                c = reader.peek();
-                if (c == '/') {
-                    reader.skip();
-                    while (reader.canRead()) {
-                        c = reader.read();
-                        if (c == '\n') break;
-                    }
-                } else if (c == '*') {
-                    reader.skip();
-                    boolean seenStar = false;
-                    while (reader.canRead()) {
-                        c = reader.read();
-                        if (c == '*') {
-                            seenStar = true;
-                        } else {
-                            if (c == '/') {
-                                if (seenStar) {
-                                    return;
-                                }
-                            } else {
-                                seenStar = false;
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            output.append(c);
         }
     }
 
@@ -267,23 +215,25 @@ public final class JavaPreprocessor {
     static List<String> extractArguments(StringReader input) {
         List<String> arguments = new ArrayList<>();
 
-        int depth = 0;
+        int callDepth = 0;
         StringBuilder argument = new StringBuilder();
         input.expect('(');
+        input.skipWhitespace();
         while (true) {
             char c = input.read();
-            if (c == ',' && depth == 0) {
+            if (c == '(') {
+                callDepth++;
+            } else if (c == ')') {
+                if (callDepth-- == 0) {
+                    break;
+                }
+            }
+            if (c == ',') {
                 arguments.add(argument.toString().trim());
                 argument.setLength(0);
+                input.skipWhitespace();
             } else {
-                if (c == '(') {
-                    depth++;
-                } else if (c == ')') {
-                    if (depth-- == 0) {
-                        break;
-                    }
-                }
-                skipComments(input, argument, c);
+                processCode(input, argument, c);
             }
         }
 
