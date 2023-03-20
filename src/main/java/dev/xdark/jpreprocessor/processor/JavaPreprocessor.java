@@ -1,28 +1,12 @@
 package dev.xdark.jpreprocessor.processor;
 
+import dev.xdark.jpreprocessor.parser.*;
+
 import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 
-@SuppressWarnings({"DuplicatedCode"})
 public final class JavaPreprocessor {
-    private static final MacroDirective EMPTY = (ctx, input, output) -> {
-    };
-    private static final Appendable NULL_APPENDABLE = new Appendable() {
-        @Override
-        public Appendable append(CharSequence csq) throws IOException {
-            return this;
-        }
-
-        @Override
-        public Appendable append(CharSequence csq, int start, int end) throws IOException {
-            return this;
-        }
-
-        @Override
-        public Appendable append(char c) throws IOException {
-            return this;
-        }
-    };
 
     private JavaPreprocessor() {
     }
@@ -40,325 +24,141 @@ public final class JavaPreprocessor {
     public static void process(CharSequence input, PreprocessorConsumer consumer) throws IOException {
         PreprocessContext ctx = new PreprocessContext();
         PreprocessorEnvironment.initBuiltins(ctx);
-        processImpl(ctx, new CharSequenceReader(input), consumer);
+        processImpl(ctx, StringReader.of(input), consumer);
     }
 
-    private static void processImpl(PreprocessContext ctx, CharSequenceReader reader, PreprocessorConsumer consumer) throws IOException {
-        while (reader.canRead()) {
-            char c = reader.read();
-            if (c == '#') {
-                if (!ctx.child) {
-                    if (reader.matches("define")) {
-                        int start = reader.getCursor();
-                        reader.skip(6);
-                        reader.skipWhitespace();
-                        String name = reader.readUnquoted().toString();
-                        String eol = reader.skipEOL();
-                        if (eol != null) {
-                            ctx.derivatives.put(name, EMPTY);
-                            consumer.append(eol);
-                        } else {
-                            List<String> args;
-                            if (reader.peek() == '(') {
-                                args = extractArguments(reader);
-                            } else {
-                                if (Character.isWhitespace(reader.peek())) {
-                                    reader.skip();
-                                }
-                                args = Collections.emptyList();
-                            }
-                            StringBuilder code = ctx.tmp;
-                            code.setLength(0);
-                            while (reader.canRead()) {
-                                char p = reader.peek();
-                                if (p == '\n' || !Character.isWhitespace(p)) {
-                                    break;
-                                }
-                                reader.skip();
-                            }
-                            if (reader.canRead()) {
-                                if (reader.peek() == '{') {
-                                    reader.skip();
-                                    int bracketDepth = 1;
-                                    do {
-                                        c = reader.read();
-                                        if (c == '{') {
-                                            bracketDepth++;
-                                        } else if (c == '}') {
-                                            if (--bracketDepth == 0) {
-                                                break;
-                                            }
-                                        }
-                                        code.append(c);
-                                    } while (reader.canRead());
-                                } else {
-                                    do {
-                                        c = reader.read();
-                                        if (c == '\n') {
-                                            break;
-                                        }
-                                        processCode(reader, code, c);
-                                    } while (reader.canRead());
-                                }
-                            }
-                            String result = code.toString();
-                            ctx.derivatives.put(name, (_ctx, input, output) -> {
-                                CharSequence insert = result;
-                                List<String> list = args;
-                                int len = list.size();
-                                if (len != 0) {
-                                    input.skipWhitespace();
-                                    List<String> $args = extractArguments(input);
-                                    if (len != $args.size()) {
-                                        throw new IllegalStateException("Mismatched argument length");
-                                    }
-                                    StringBuilder tmp = _ctx.tmp;
-                                    PreprocessContext fork = new PreprocessContext(_ctx.derivatives);
-                                    PreprocessorConsumer dumper = dumper(tmp);
-                                    fork.child = true;
-                                    for (int i = 0; i < len; i++) {
-                                        tmp.setLength(0);
-                                        processImpl(fork, new CharSequenceReader($args.get(i)), dumper);
-                                        $args.set(i, tmp.toString());
-                                    }
-                                    tmp.setLength(0);
-                                    Map<String, MacroDirective> copy = new HashMap<>(_ctx.derivatives);
-                                    fork = new PreprocessContext(copy);
-                                    for (int i = 0; i < len; i++) {
-                                        String key = list.get(i);
-                                        String s = $args.get(i);
-                                        copy.put(key, ($ctx, ____, os) -> {
-                                            os.append(s);
-                                        });
-                                    }
-                                    fork.child = true;
-                                    processImpl(fork, new CharSequenceReader(insert), dumper(tmp));
-                                    insert = tmp;
-                                }
-                                output.append(insert);
-                            });
-                        }
-                        if (consumer != null) {
-                            consumer.definition(start, reader.getCursor());
-                        }
-                        continue;
-                    }
-                }
-                if (consumer != null) {
-                    int cursor = reader.getCursor();
-                    if (cursor > 0) {
-                        if (!Character.isWhitespace(reader.peek(-1))) {
-                            String macro = reader.readUnquoted().toString();
-                            MacroDirective derivative = ctx.derivatives.get(macro);
-                            if (derivative != null) {
-                                Map<String, MacroDirective> copy = new HashMap<>(ctx.derivatives);
-                                int end = reader.getCursor();
-                                consumer.macroPrefix(cursor, end, output -> {
-                                    PreprocessContext _ctx = new PreprocessContext(copy);
-                                    CharSequenceReader _reader = reader.copy(cursor, end);
-                                    derivative.expand(_ctx, _reader, output);
-                                });
-                            }
-                        }
-                    }
-                }
-            } else if (c == '!') {
-                processMacro(ctx, reader, consumer);
-            } else {
-                processCode(reader, consumer, c);
+    private static void processImpl(PreprocessContext ctx, StringReader reader, PreprocessorConsumer csm) throws IOException {
+        CharSequence text = reader.text();
+        Lexer lexer = newLexer(reader);
+        Token last = null;
+        loop:
+        while (true) {
+            Token token = lexer.next();
+            int prepend = 0;
+            if (last != null) {
+                prepend = last.end();
             }
-        }
-    }
-
-    private static void processMacro(PreprocessContext ctx, CharSequenceReader reader, PreprocessorConsumer consumer) throws IOException {
-        int cursor = reader.getCursor();
-        int offset = -2;
-        while (cursor-- > 1) {
-            char in = reader.peek(offset);
-            if (Character.isWhitespace(in) || in == '.' || in == '(') {
+            csm.append(text, prepend, token.start());
+            TokenKind kind = token.kind();
+            if (kind == JavaTokenKind.SLASHSLASH) {
+                reader.skipLine();
+                csm.append(text, token.start(), reader.position());
+                csm.append('\n');
+                last = null;
+                continue;
+            } else if (kind == JavaTokenKind.SLASHSTAR) {
+                while (true) {
+                    Token tmp = lexer.next();
+                    kind = tmp.kind();
+                    if (kind == JavaTokenKind.EOF) {
+                        throw new IllegalStateException("Expected */");
+                    }
+                    if (kind == JavaTokenKind.STARSLASH) {
+                        last = tmp;
+                        csm.append(text, token.start(), tmp.end());
+                        continue loop;
+                    }
+                }
+            } else if (kind == JavaTokenKind.IDENTIFIER) {
+                Token next = lexer.token(1);
+                if (next.kind() == JavaTokenKind.EXCLAMATION) {
+                    String directiveName = textify(lexer, token);
+                    MacroDirective directive = ctx.lookup(directiveName);
+                    if (directive == null) {
+                        throw new IllegalStateException("Unknown directive " + directiveName);
+                     }
+                    lexer.consumeToken();
+                    if (directive.consume(ctx, lexer, csm)) {
+                        int start = next.end();
+                        int end = reader.position();
+                        // TODO FIX ME: context should not be shared, and API should be
+                        // changed to store a bit more information
+                        csm.macroSuffix(start, end, directive(directiveName, output -> {
+                            StringReader slice = StringReader.of(text.subSequence(start, end));
+                            directive.expand(ctx, newLexer(slice), output);
+                        }));
+                    }
+                    last = lexer.current();
+                    continue;
+                }
+            }
+            csm.append(text, token.start(), token.end());
+            if (token.kind() == JavaTokenKind.EOF) {
                 break;
             }
-            offset--;
-        }
-        cursor = reader.getCursor();
-        String name = reader.source().subSequence(cursor + offset + 1, cursor - 1).toString();
-        MacroDirective derivative = ctx.derivatives.get(name);
-        if (derivative == null) {
-            consumer.append('!');
-            return;
-        }
-        Map<String, MacroDirective> copy = new HashMap<>(ctx.derivatives);
-        int $cursor = cursor;
-        // Look ahead
-        reader.skipWhitespace();
-        if (reader.canRead() && reader.peek() == '(') {
-            skipArguments(reader);
-        }
-        int end = reader.getCursor();
-        consumer.advance(-name.length());
-        consumer.macroSuffix(cursor, end, output -> {
-            PreprocessContext _ctx = new PreprocessContext(copy);
-            CharSequenceReader _reader = reader.copy($cursor, end);
-            derivative.expand(_ctx, _reader, output);
-        });
-    }
-
-    private static void processCode(CharSequenceReader reader, Appendable appendable, char c) throws IOException {
-        switch (c) {
-            case '/': {
-                if (reader.canRead(1)) {
-                    c = reader.peek();
-                    if (c == '/') {
-                        reader.skip();
-                        appendable.append("//");
-                        while (reader.canRead()) {
-                            c = reader.read();
-                            appendable.append(c);
-                            if (c == '\n') break;
-                        }
-                    } else if (c == '*') {
-                        reader.skip();
-                        appendable.append("/*");
-                        boolean seenStar = false;
-                        while (reader.canRead()) {
-                            c = reader.read();
-                            appendable.append(c);
-                            if (c == '*') {
-                                seenStar = true;
-                            } else {
-                                if (c == '/') {
-                                    if (seenStar) {
-                                        return;
-                                    }
-                                } else {
-                                    seenStar = false;
-                                }
-                            }
-                        }
-                    }
-                }
-                break;
-            }
-            case '"':
-            case '\'': {
-                appendable.append(c);
-                boolean skip = false;
-                char end = c;
-                while (reader.canRead()) {
-                    c = reader.read();
-                    appendable.append(c);
-                    if (skip) {
-                        skip = false;
-                        continue;
-                    }
-                    if (c == '\\') {
-                        skip = true;
-                    } else if (c == end) {
-                        return;
-                    }
-                }
-                throw new IllegalStateException("Did not end string sequence");
-            }
-            default:
-                appendable.append(c);
+            last = token;
         }
     }
 
-    static void skipArguments(CharSequenceReader input) throws IOException {
-        int callDepth = 0;
-        input.expect('(');
-        input.skipWhitespace();
-        while (true) {
-            char c = input.read();
-            if (c == '(') {
-                callDepth++;
-            } else if (c == ')') {
-                if (callDepth-- == 0) {
-                    break;
-                }
-            }
-            if (c == ',' && callDepth == 0) {
-                input.skipWhitespace();
-            } else {
-                processCode(input, NULL_APPENDABLE, c);
-            }
-        }
+    static String textify(Lexer lexer, Token token) {
+        return lexer.source().text().subSequence(token.start(), token.end()).toString();
     }
 
-    static List<String> extractArguments(CharSequenceReader input) throws IOException {
-        List<String> arguments = new ArrayList<>();
-
-        int callDepth = 0;
-        StringBuilder argument = new StringBuilder();
-        input.expect('(');
-        input.skipWhitespace();
-        while (true) {
-            char c = input.read();
-            if (c == '(') {
-                callDepth++;
-            } else if (c == ')') {
-                if (callDepth-- == 0) {
-                    break;
-                }
-            }
-            if (c == ',' && callDepth == 0) {
-                arguments.add(argument.toString().trim());
-                argument.setLength(0);
-                input.skipWhitespace();
-            } else {
-                processCode(input, argument, c);
-            }
-        }
-
-        if (argument.length() > 0) {
-            arguments.add(argument.toString().trim());
-        }
-
-        return arguments;
+    private static Lexer newLexer(StringReader source) {
+        return new DefaultLexer(new DefaultTokenizer(source, new BasicTokens()));
     }
 
-    private static PreprocessorConsumer dumper(StringBuilder builder) {
+    private static PreprocessorDirective directive(String name, Evaluate evaluate) {
+        return new PreprocessorDirective() {
+            @Override
+            public String directiveName() {
+                return name;
+            }
+
+            @Override
+            public void evaluate(Appendable output) throws IOException {
+                evaluate.evaluate(output);
+            }
+        };
+    }
+
+    private static PreprocessorConsumer dumper(StringBuilder sb) {
         return new PreprocessorConsumer() {
-            @Override
-            public void advance(int length) {
-                builder.setLength(builder.length() + length);
-            }
-
-            @Override
-            public Appendable append(CharSequence csq) throws IOException {
-                builder.append(csq);
-                return this;
-            }
-
-            @Override
-            public Appendable append(CharSequence csq, int start, int end) throws IOException {
-                builder.append(csq, start, end);
-                return this;
-            }
-
-            @Override
-            public Appendable append(char c) throws IOException {
-                builder.append(c);
-                return this;
-            }
 
             @Override
             public void definition(int start, int end) {
             }
 
             @Override
-            public void macroPrefix(int start, int end, PreprocessorResult result) {
+            public void macroPrefix(int start, int end, PreprocessorDirective result) {
                 try {
-                    result.evaluate(builder);
+                    result.evaluate(sb);
                 } catch (IOException ex) {
                     throw new RuntimeException(ex);
                 }
             }
 
             @Override
-            public void macroSuffix(int start, int end, PreprocessorResult result) {
-                macroPrefix(start, end, result);
+            public void macroSuffix(int start, int end, PreprocessorDirective result) {
+                try {
+                    result.evaluate(sb);
+                } catch (IOException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+
+            @Override
+            public Appendable append(CharSequence csq) throws IOException {
+                sb.append(csq);
+                return this;
+            }
+
+            @Override
+            public Appendable append(CharSequence csq, int start, int end) throws IOException {
+                sb.append(csq, start, end);
+                return this;
+            }
+
+            @Override
+            public Appendable append(char c) throws IOException {
+                sb.append(c);
+                return this;
             }
         };
+    }
+
+    private interface Evaluate {
+
+        void evaluate(Appendable output) throws IOException;
     }
 }

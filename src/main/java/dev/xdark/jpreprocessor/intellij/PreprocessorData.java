@@ -1,7 +1,7 @@
 package dev.xdark.jpreprocessor.intellij;
 
 import dev.xdark.jpreprocessor.processor.PreprocessorConsumer;
-import dev.xdark.jpreprocessor.processor.PreprocessorResult;
+import dev.xdark.jpreprocessor.processor.PreprocessorDirective;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -11,21 +11,17 @@ final class PreprocessorData implements PreprocessorConsumer {
     int length;
 
     @Override
-    public void advance(int length) {
-    }
-
-    @Override
     public void definition(int start, int end) {
         push(start, end);
     }
 
     @Override
-    public void macroPrefix(int start, int end, PreprocessorResult result) {
+    public void macroPrefix(int start, int end, PreprocessorDirective result) {
         push(start, end);
     }
 
     @Override
-    public void macroSuffix(int start, int end, PreprocessorResult result) {
+    public void macroSuffix(int start, int end, PreprocessorDirective result) {
         push(start, end);
     }
 

@@ -33,3 +33,7 @@ tasks {
     untilBuild.set("232.*")
   }
 }
+
+dependencies {
+  implementation("org.mozilla:rhino:1.7.14")
+}
