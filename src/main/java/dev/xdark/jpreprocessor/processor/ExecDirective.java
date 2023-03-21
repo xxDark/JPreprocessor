@@ -36,7 +36,6 @@ public final class ExecDirective implements MacroDirective {
             if (kind == JavaTokenKind.LBRACE) {
                 depth++;
             } else if (kind == JavaTokenKind.RBRACE && --depth == 0) {
-                lexer.consumeToken();
                 break;
             }
         }
