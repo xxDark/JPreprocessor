@@ -124,8 +124,10 @@ public final class SourceCodeHelper {
                     break;
                 }
                 builder.append(text, token.start(), token.end());
-                if (kind == JavaTokenKind.LPAREN) {
+                if (kind == JavaTokenKind.LPAREN || kind == JavaTokenKind.LBRACKET) {
                     depth++;
+                } else if (kind == JavaTokenKind.RBRACKET) {
+                    depth--;
                 }
             }
         }

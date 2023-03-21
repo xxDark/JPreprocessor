@@ -226,6 +226,10 @@ public final class DefaultTokenizer implements Tokenizer {
                     reader.next();
                     tk = JavaTokenKind.HASHTAG;
                     break loop;
+                case '`':
+                    reader.next();
+                    tk = JavaTokenKind.BACKQUOTE;
+                    break loop;
                 case '*':
                     if (reader.accept("*/")) {
                         append("*/");

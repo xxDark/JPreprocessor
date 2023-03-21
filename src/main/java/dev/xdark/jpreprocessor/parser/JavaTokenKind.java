@@ -26,6 +26,7 @@ public enum JavaTokenKind implements TokenKind {
     STARSLASH("*/"),
     ELLIPSIS("..."),
     EXCLAMATION("!"),
+    BACKQUOTE("`"),
     EQ("="),
     PLUS("+"),
     MINUS("-"),

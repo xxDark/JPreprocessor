@@ -24,7 +24,7 @@ define! listOf(...) {
     write(')')
 }
 define! sout(value) {
-    write("System.out.println(" + value + ");")
+    write(`System.out.println(${value});`)
 }
 public class Test {
   public static void main(String[] args) {
