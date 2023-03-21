@@ -1,6 +1,5 @@
 package dev.xdark.jpreprocessor.parser;
 
-// javac parts are not exposed to the public API, so here we are...
 public final class DefaultTokenizer implements Tokenizer {
     private final StringBuilder sb = new StringBuilder(512);
     private final StringReader reader;
@@ -16,9 +15,7 @@ public final class DefaultTokenizer implements Tokenizer {
 
     @Override
     public Token readToken() {
-        sb.setLength(0);
-        radix = 0;
-        hasEscapeSequences = false;
+        reset();
 
         StringReader reader = this.reader;
         int pos;
@@ -99,10 +96,10 @@ public final class DefaultTokenizer implements Tokenizer {
                     reader.next();
 
                     if (reader.acceptOneOf('x', 'X')) {
-                        verifyUnderscore();
+                        skipIllegalUnderscores();
                         scanNumber(pos, 16);
                     } else if (reader.acceptOneOf('b', 'B')) {
-                        verifyUnderscore();
+                        skipIllegalUnderscores();
                         scanNumber(pos, 2);
                     } else {
                         append('0');
@@ -139,7 +136,7 @@ public final class DefaultTokenizer implements Tokenizer {
                             throw new IllegalStateException("Invalid dot");
                         } else if (reader.digit(10) >= 0) {
                             append('.');
-                            scanFractionAndSuffix();
+                            scanFractionAndSuffix(pos);
                         } else {
                             tk = JavaTokenKind.DOT;
                         }
@@ -190,6 +187,10 @@ public final class DefaultTokenizer implements Tokenizer {
                         tk = JavaTokenKind.SLASH;
                     }
                     break loop;
+                case '\\':
+                    reader.next();
+                    tk = JavaTokenKind.BACKSLASH;
+                    break loop;
                 case '!':
                     reader.next();
                     tk = JavaTokenKind.EXCLAMATION;
@@ -200,14 +201,14 @@ public final class DefaultTokenizer implements Tokenizer {
                     if (reader.accept('\'')) {
                         throw new IllegalStateException("Empty character");
                     } else {
-                        if (isEOL()) {
+                        if (isEOLN()) {
                             throw new IllegalStateException("Illegal line ending");
                         }
 
                         scanLitChar();
 
                         if (reader.accept('\'')) {
-                            tk = JavaTokenKind.CHAR_VALU;
+                            tk = JavaTokenKind.CHAR_VALUE;
                         } else {
                             throw new IllegalStateException("character not closed");
                         }
@@ -216,6 +217,10 @@ public final class DefaultTokenizer implements Tokenizer {
 
                 case '\"':
                     scanString();
+                    break loop;
+                case ':':
+                    reader.next();
+                    tk = JavaTokenKind.COLUMN;
                     break loop;
                 case '#':
                     reader.next();
@@ -249,13 +254,26 @@ public final class DefaultTokenizer implements Tokenizer {
                     tk = JavaTokenKind.EOF;
                     pos = reader.position();
                 } else {
-                    throw new IllegalStateException("Illegal character " + reader.getCodepoint());
+                    String arg;
+
+                    if (reader.isSurrogate()) {
+                        int codePoint = reader.getCodepoint();
+                        char hi = Character.highSurrogate(codePoint);
+                        char lo = Character.lowSurrogate(codePoint);
+                        arg = String.format("\\u%04x\\u%04x", (int) hi, (int) lo);
+                    } else {
+                        char ch = reader.get();
+                        arg = (32 < ch && ch < 127) ? String.format("%s", ch) :
+                                String.format("\\u%04x", (int) ch);
+                    }
+
+                    throw new IllegalStateException("Illegal character " + arg);
                 }
             }
             break;
         }
         int endPos = reader.position();
-        if (tk.tag() == TokenKindTag.DEFAULT) {
+        if (tk.tag() == JavaTokenKindTag.DEFAULT) {
             return new Token(tk, pos, endPos);
         } else {
             String string = sb.toString();
@@ -275,6 +293,13 @@ public final class DefaultTokenizer implements Tokenizer {
     @Override
     public StringReader source() {
         return reader;
+    }
+
+    @Override
+    public void reset() {
+        sb.setLength(0);
+        radix = 0;
+        hasEscapeSequences = false;
     }
 
     private void append(char ch) {
@@ -298,24 +323,25 @@ public final class DefaultTokenizer implements Tokenizer {
         sb.append(string);
     }
 
-    private void storeAndNext() {
+    private char appendThenNext() {
         append();
 
-        reader.next();
+        return reader.next();
     }
 
-    private boolean acceptAndAppend(char ch1, char ch2) {
+    private boolean acceptOneOfThenAppend(char ch1, char ch2) {
         StringReader reader = this.reader;
         if (reader.isOneOf(ch1, ch2)) {
             append(reader.get());
             reader.next();
+
             return true;
         }
 
         return false;
     }
 
-    private boolean acceptThenPut(char ch) {
+    private boolean acceptThenAppend(char ch) {
         StringReader reader = this.reader;
         if (reader.is(ch)) {
             append(reader.get());
@@ -327,12 +353,12 @@ public final class DefaultTokenizer implements Tokenizer {
         return false;
     }
 
-    private boolean isEOL() {
+    private boolean isEOLN() {
         return reader.isOneOf('\n', '\r');
     }
 
     private void scanIdent() {
-        storeAndNext();
+        appendThenNext();
 
         StringReader reader = this.reader;
         do {
@@ -460,7 +486,7 @@ public final class DefaultTokenizer implements Tokenizer {
                     }
             }
 
-            storeAndNext();
+            appendThenNext();
         } while (true);
     }
 
@@ -468,9 +494,10 @@ public final class DefaultTokenizer implements Tokenizer {
         tk = tokens.lookup(sb.toString());
     }
 
-    private void verifyUnderscore() {
+    private void skipIllegalUnderscores() {
         if (reader.is('_')) {
             throw new IllegalStateException("Illegal underscore");
+            //skip('_');
         }
     }
 
@@ -495,17 +522,19 @@ public final class DefaultTokenizer implements Tokenizer {
         }
     }
 
-    private void scanFraction() {
-        verifyUnderscore();
+    private void scanFraction(int pos) {
+        skipIllegalUnderscores();
 
         if (reader.digit(10) >= 0) {
             scanDigits(10);
         }
 
-        if (acceptAndAppend('e', 'E')) {
-            verifyUnderscore();
-            acceptAndAppend('+', '-');
-            verifyUnderscore();
+        // int index = sb.length();
+
+        if (acceptOneOfThenAppend('e', 'E')) {
+            skipIllegalUnderscores();
+            acceptOneOfThenAppend('+', '-');
+            skipIllegalUnderscores();
 
             if (reader.digit(10) >= 0) {
                 scanDigits(10);
@@ -513,26 +542,28 @@ public final class DefaultTokenizer implements Tokenizer {
             }
 
             throw new IllegalStateException("Malformed float point number");
+            //lexError(pos, CompilerProperties.Errors.MalformedFpLit);
+            //sb.setLength(index);
         }
     }
 
-    private void scanFractionAndSuffix() {
+    private void scanFractionAndSuffix(int pos) {
         radix = 10;
-        scanFraction();
+        scanFraction(pos);
 
-        if (acceptAndAppend('f', 'F')) {
+        if (acceptOneOfThenAppend('f', 'F')) {
             tk = JavaTokenKind.FLOAT_VALUE;
         } else {
-            acceptAndAppend('d', 'D');
+            acceptOneOfThenAppend('d', 'D');
             tk = JavaTokenKind.DOUBLE_VALUE;
         }
     }
 
-    private void scanHexExponentAndSuffix() {
-        if (acceptAndAppend('p', 'P')) {
-            verifyUnderscore();
-            acceptAndAppend('+', '-');
-            verifyUnderscore();
+    private void scanHexExponentAndSuffix(int pos) {
+        if (acceptOneOfThenAppend('p', 'P')) {
+            skipIllegalUnderscores();
+            acceptOneOfThenAppend('+', '-');
+            skipIllegalUnderscores();
 
             if (reader.digit(10) >= 0) {
                 scanDigits(10);
@@ -543,10 +574,10 @@ public final class DefaultTokenizer implements Tokenizer {
             throw new IllegalStateException("Invalid float point number");
         }
 
-        if (acceptAndAppend('f', 'F')) {
+        if (acceptOneOfThenAppend('f', 'F')) {
             tk = JavaTokenKind.FLOAT_VALUE;
         } else {
-            acceptAndAppend('d', 'D');
+            acceptOneOfThenAppend('d', 'D');
             tk = JavaTokenKind.DOUBLE_VALUE;
         }
         radix = 16;
@@ -554,8 +585,8 @@ public final class DefaultTokenizer implements Tokenizer {
 
     private void scanHexFractionAndSuffix(int pos, boolean seendigit) {
         radix = 16;
-        storeAndNext();
-        verifyUnderscore();
+        appendThenNext();
+        skipIllegalUnderscores();
 
         if (reader.digit(16) >= 0) {
             seendigit = true;
@@ -565,7 +596,7 @@ public final class DefaultTokenizer implements Tokenizer {
         if (!seendigit)
             throw new IllegalStateException("Invalid hex number");
         else
-            scanHexExponentAndSuffix();
+            scanHexExponentAndSuffix(pos);
     }
 
     private void scanNumber(int pos, int radix) {
@@ -583,19 +614,23 @@ public final class DefaultTokenizer implements Tokenizer {
         if (radix == 16 && reader.is('.')) {
             scanHexFractionAndSuffix(pos, seendigit);
         } else if (seendigit && radix == 16 && reader.isOneOf('p', 'P')) {
-            scanHexExponentAndSuffix();
+            scanHexExponentAndSuffix(pos);
         } else if (digitRadix == 10 && reader.is('.')) {
-            storeAndNext();
-            scanFractionAndSuffix();
+            appendThenNext();
+            scanFractionAndSuffix(pos);
         } else if (digitRadix == 10 && reader.isOneOf('e', 'E', 'f', 'F', 'd', 'D')) {
-            scanFractionAndSuffix();
+            scanFractionAndSuffix(pos);
         } else {
             if (!seenValidDigit) {
                 switch (radix) {
                     case 2:
+                        //lexError(pos, CompilerProperties.Errors.InvalidBinaryNumber);
                         throw new IllegalStateException("Invalid binary text");
+                        //break;
                     case 16:
+                        //lexError(pos, CompilerProperties.Errors.InvalidHexNumber);
                         throw new IllegalStateException("Invalid hex text");
+                        //break;
                 }
             }
             if (radix == 8) {
@@ -612,8 +647,13 @@ public final class DefaultTokenizer implements Tokenizer {
         }
     }
 
+    private void skipLineTerminator() {
+        reader.accept('\r');
+        reader.accept('\n');
+    }
+
     private void scanLitChar() {
-        if (acceptThenPut('\\')) {
+        if (acceptThenAppend('\\')) {
             hasEscapeSequences = true;
 
             switch (reader.get()) {
@@ -626,13 +666,13 @@ public final class DefaultTokenizer implements Tokenizer {
                 case '6':
                 case '7':
                     char leadch = reader.get();
-                    storeAndNext();
+                    appendThenNext();
 
                     if (reader.inRange('0', '7')) {
-                        storeAndNext();
+                        appendThenNext();
 
                         if (leadch <= '3' && reader.inRange('0', '7')) {
-                            storeAndNext();
+                            appendThenNext();
                         }
                     }
                     break;
@@ -645,14 +685,18 @@ public final class DefaultTokenizer implements Tokenizer {
                 case '\'':
                 case '\"':
                 case '\\':
-                    storeAndNext();
+                    appendThenNext();
                     break;
+
+                case '\n':
+                case '\r':
+                    throw new IllegalStateException("Bad escape character");
 
                 default:
                     throw new IllegalStateException("Bad escape character");
             }
         } else {
-            storeAndNext();
+            appendThenNext();
         }
     }
 
@@ -666,7 +710,7 @@ public final class DefaultTokenizer implements Tokenizer {
                 return;
             }
 
-            if (isEOL()) {
+            if (isEOLN()) {
                 break;
             } else {
                 scanLitChar();

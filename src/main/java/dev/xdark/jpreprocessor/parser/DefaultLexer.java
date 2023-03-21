@@ -49,6 +49,14 @@ public final class DefaultLexer implements Lexer {
         return tokenizer.source();
     }
 
+    @Override
+    public void reset() {
+        previous = null;
+        token = null;
+        cache.clear();
+        tokenizer.reset();
+    }
+
     private void lookahead(int n) {
         List<Token> cache = this.cache;
         Tokenizer tokenizer = this.tokenizer;

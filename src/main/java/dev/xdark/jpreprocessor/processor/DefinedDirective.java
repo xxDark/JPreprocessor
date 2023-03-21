@@ -6,7 +6,7 @@ import dev.xdark.jpreprocessor.parser.Token;
 
 import java.io.IOException;
 
-public class UndefineDirective implements MacroDirective {
+final class DefinedDirective implements MacroDirective {
 
     @Override
     public void expand(PreprocessorEnvironment env, Lexer lexer, Appendable output) throws IOException {
@@ -15,9 +15,7 @@ public class UndefineDirective implements MacroDirective {
         lexer.expect(JavaTokenKind.IDENTIFIER);
         lexer.nextExpect(JavaTokenKind.RPAREN);
         String name = JavaPreprocessor.textify(lexer, identifier);
-        if (!env.setDirective(name, null)) {
-            throw new IllegalStateException("Failed to remove directive name");
-        }
+        output.append(env.getDirective(name) == null ? "0" : "1");
     }
 
     @Override

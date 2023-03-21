@@ -1,10 +1,14 @@
 package dev.xdark.jpreprocessor.processor;
 
-public class PreprocessorEnvironment {
+import java.util.Map;
 
-    static void initBuiltins(PreprocessContext ctx) {
-        ctx.setDirective("define", new DefineDirective());
-        ctx.setDirective("undefine", new UndefineDirective());
-        ctx.setDirective("puts", new PutsDirective());
-    }
+public interface PreprocessorEnvironment extends IncludeDiscoverer {
+
+    MacroDirective getDirective(String name);
+
+    boolean setDirective(String name, MacroDirective directive);
+
+    Map<String, MacroDirective> getRegisteredDirectives();
+
+    PreprocessorEnvironment clone();
 }

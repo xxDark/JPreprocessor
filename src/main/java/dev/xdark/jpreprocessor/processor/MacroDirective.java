@@ -6,7 +6,7 @@ import java.io.IOException;
 
 public interface MacroDirective {
 
-    void expand(PreprocessContext ctx, Lexer lexer, Appendable output) throws IOException;
+    void expand(PreprocessorEnvironment env, Lexer lexer, Appendable output) throws IOException;
 
-    boolean consume(PreprocessContext ctx, Lexer lexer, PreprocessorConsumer csm);
+    boolean consume(PreprocessorEnvironment env, Lexer lexer, PreprocessorConsumer csm);
 }

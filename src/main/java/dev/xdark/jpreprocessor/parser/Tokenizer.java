@@ -5,4 +5,6 @@ public interface Tokenizer {
     Token readToken();
 
     StringReader source();
+
+    void reset();
 }

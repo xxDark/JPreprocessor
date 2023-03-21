@@ -10,6 +10,23 @@ public final class SourceCodeHelper {
     private SourceCodeHelper() {
     }
 
+    public static void consumeDirectiveCall(Lexer lexer) {
+        int depth = 1;
+        lexer.expect(JavaTokenKind.LPAREN);
+        while (true) {
+            Token token = lexer.next();
+            TokenKind kind = token.kind();
+            if (kind == JavaTokenKind.EOF) {
+                throw new IllegalStateException("Unexpected EOF");
+            }
+            if (kind == JavaTokenKind.LPAREN) {
+                depth++;
+            } else if (kind == JavaTokenKind.RPAREN && --depth == 0) {
+                break;
+            }
+        }
+    }
+
     public static void consumeDirectiveDefinition(Lexer lexer) {
         Token token = lexer.current();
         TokenKind kind = token.kind();
@@ -19,25 +36,23 @@ public final class SourceCodeHelper {
         while (true) {
             token = lexer.next();
             kind = token.kind();
-            if (kind == JavaTokenKind.IDENTIFIER) {
+            if (kind != JavaTokenKind.RPAREN) {
+                if (kind == JavaTokenKind.EOF) {
+                    throw new IllegalStateException("Unexpected EOF");
+                }
                 token = lexer.token(1);
                 if (token.kind() == JavaTokenKind.COMMA) {
                     lexer.consumeToken();
                 }
                 continue;
             }
-            if (kind == JavaTokenKind.RPAREN) {
-                break;
-            }
-            throw new IllegalStateException("Expected )");
+            break;
         }
         // We need to look ahead here to avoid confusion when silently changing
         // last token in JavaPreprocessor
         token = lexer.token(1);
         kind = token.kind();
-        if (kind == JavaTokenKind.EQ) {
-            lexer.source().skipLine();
-        } else if (kind == JavaTokenKind.LBRACE) {
+        if (kind == JavaTokenKind.LBRACE) {
             lexer.consumeToken();
             int depth = 1;
             while (true) {
@@ -58,42 +73,16 @@ public final class SourceCodeHelper {
     }
 
     public static DirectiveDefinition getDirectiveDefinition(Lexer lexer) {
-        Token token = lexer.current();
-        TokenKind kind = token.kind();
-        if (kind != JavaTokenKind.LPAREN) {
-            throw new IllegalStateException("Expected (");
-        }
-        List<String> args = new ArrayList<>();
-        while (true) {
-            token = lexer.next();
-            kind = token.kind();
-            if (kind == JavaTokenKind.IDENTIFIER) {
-                String argName = JavaPreprocessor.textify(lexer, token);
-                token = lexer.token(1);
-                if (token.kind() == JavaTokenKind.COMMA) {
-                    lexer.consumeToken();
-                }
-                args.add(argName);
-                continue;
-            }
-            if (kind == JavaTokenKind.RPAREN) {
-                break;
-            }
-            throw new IllegalStateException("Expected )");
-        }
+        List<String> args = getArgumentNames(lexer);
         StringReader reader = lexer.source();
-        token = lexer.next();
-        kind = token.kind();
+        Token token = lexer.next();
+        TokenKind kind = token.kind();
         int codeStart = lexer.token(1).start();
-        int codeEnd = -1;
-        if (kind == JavaTokenKind.EQ) {
-            reader.skipLine();
-            codeEnd = reader.position();
-        } else if (kind == JavaTokenKind.LBRACE) {
+        int codeEnd;
+        if (kind == JavaTokenKind.LBRACE) {
             int depth = 1;
             while (true) {
-                lexer.consumeToken();
-                token = lexer.current();
+                token = lexer.next();
                 kind = token.kind();
                 if (kind == JavaTokenKind.EOF) {
                     throw new IllegalStateException("Unexpected EOF");
@@ -112,7 +101,77 @@ public final class SourceCodeHelper {
         }
         return new DirectiveDefinition(
                 args,
-                new CodeRange(codeStart, codeEnd)
+                reader.text().subSequence(codeStart, codeEnd).toString()
         );
+    }
+
+    static List<Object> getArgumentValues(Lexer lexer) {
+        Token token;
+        TokenKind kind;
+        List<Object> args = new ArrayList<>();
+        StringBuilder builder = new StringBuilder();
+        CharSequence text = lexer.source().text();
+        lexer.expect(JavaTokenKind.LPAREN);
+        int depth = 1;
+        while (true) {
+            token = lexer.next();
+            kind = token.kind();
+            if (kind == JavaTokenKind.COMMA && depth == 1) {
+                addArgument(args, builder);
+                builder.setLength(0);
+            } else {
+                if (kind == JavaTokenKind.RPAREN && --depth == 0) {
+                    break;
+                }
+                builder.append(text, token.start(), token.end());
+                if (kind == JavaTokenKind.LPAREN) {
+                    depth++;
+                }
+            }
+        }
+        if (builder.length() > 0) {
+            addArgument(args, builder);
+        }
+        return args;
+    }
+
+    static List<String> getArgumentNames(Lexer lexer) {
+        Token token;
+        TokenKind kind;
+        List<String> args = new ArrayList<>();
+        StringBuilder builder = new StringBuilder();
+        CharSequence text = lexer.source().text();
+        lexer.expect(JavaTokenKind.LPAREN);
+        int depth = 1;
+        while (true) {
+            token = lexer.next();
+            kind = token.kind();
+            if (kind == JavaTokenKind.COMMA && depth == 1) {
+                args.add(builder.toString());
+                builder.setLength(0);
+            } else {
+                if (kind == JavaTokenKind.RPAREN && --depth == 0) {
+                    break;
+                }
+                builder.append(text, token.start(), token.end());
+                if (kind == JavaTokenKind.LPAREN) {
+                    depth++;
+                }
+            }
+        }
+        if (builder.length() > 0) {
+            args.add(builder.toString());
+        }
+        return args;
+    }
+
+    static Lexer newLexer(StringReader source) {
+        return new DefaultLexer(new DefaultTokenizer(source, new BasicTokens()));
+    }
+
+    private static void addArgument(List<Object> args, StringBuilder builder) {
+        Lexer argument = newLexer(StringReader.of(builder.toString()));
+        argument.consumeToken();
+        args.add(ValueParser.parseValue(argument));
     }
 }

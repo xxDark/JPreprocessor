@@ -3,6 +3,8 @@ package dev.xdark.jpreprocessor.javac;
 import com.sun.tools.javac.parser.JavacParser;
 import com.sun.tools.javac.parser.ParserFactory;
 import com.sun.tools.javac.util.Context;
+import dev.xdark.jpreprocessor.processor.BasicPreprocessorEnvironment;
+import dev.xdark.jpreprocessor.processor.IncludeDiscoverer;
 import dev.xdark.jpreprocessor.processor.JavaPreprocessor;
 
 public final class InjectedParserFactory extends ParserFactory {
@@ -22,6 +24,6 @@ public final class InjectedParserFactory extends ParserFactory {
     }
 
     private static CharSequence preprocess(CharSequence cs) {
-        return JavaPreprocessor.process(cs);
+        return JavaPreprocessor.process(new BasicPreprocessorEnvironment(IncludeDiscoverer.noDiscover()), cs);
     }
 }

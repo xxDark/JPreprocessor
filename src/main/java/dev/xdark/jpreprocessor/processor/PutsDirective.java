@@ -10,26 +10,33 @@ import java.io.IOException;
 final class PutsDirective implements MacroDirective {
 
     @Override
-    public void expand(PreprocessContext ctx, Lexer lexer, Appendable output) throws IOException {
-        lexer.expectNext(JavaTokenKind.LPAREN);
-        int depth = 1;
-        Token previous = null;
+    public void expand(PreprocessorEnvironment env, Lexer lexer, Appendable output) throws IOException {
         CharSequence text = lexer.source().text();
+        lexer.consumeToken();
+        Token previous = lexer.expect(JavaTokenKind.LPAREN);;
+        int depth = 1;
+        boolean escape = false;
         while (true) {
             Token token = lexer.next();
-            TokenKind kind = token.kind();
-            if (kind == JavaTokenKind.EOF) {
-                throw new IllegalStateException("Expected )");
+            int prepend = 0;
+            if (previous != null) {
+                prepend = previous.end();
             }
-            if (kind == JavaTokenKind.LPAREN) {
-                depth++;
-            } else if (kind == JavaTokenKind.RPAREN) {
-                if (--depth == 0) {
+            output.append(text, prepend, token.start());
+            TokenKind kind = token.kind();
+            if (kind == JavaTokenKind.BACKSLASH) {
+                escape = true;
+                previous = token;
+                continue;
+            }
+            if (escape) {
+                escape = false;
+            } else {
+                if (kind == JavaTokenKind.LPAREN) {
+                    depth++;
+                } else if (kind == JavaTokenKind.RPAREN && --depth == 0) {
                     break;
                 }
-            }
-            if (previous != null) {
-                output.append(text, previous.end(), token.start());
             }
             output.append(text, token.start(), token.end());
             previous = token;
@@ -37,9 +44,31 @@ final class PutsDirective implements MacroDirective {
     }
 
     @Override
-    public boolean consume(PreprocessContext ctx, Lexer lexer, PreprocessorConsumer csm) {
+    public boolean consume(PreprocessorEnvironment env, Lexer lexer, PreprocessorConsumer csm) {
         lexer.consumeToken();
-        SourceCodeHelper.consumeDirectiveDefinition(lexer);
+        lexer.expect(JavaTokenKind.LPAREN);
+        int depth = 1;
+        boolean escape = false;
+        while (true) {
+            Token token = lexer.next();
+            TokenKind kind = token.kind();
+            if (kind == JavaTokenKind.EOF) {
+                throw new IllegalStateException("Unexpected EOF");
+            }
+            if (kind == JavaTokenKind.BACKSLASH) {
+                escape = true;
+                continue;
+            }
+            if (escape) {
+                escape = false;
+            } else {
+                if (kind == JavaTokenKind.LPAREN) {
+                    depth++;
+                } else if (kind == JavaTokenKind.RPAREN && --depth == 0) {
+                    break;
+                }
+            }
+        }
         return true;
     }
 }

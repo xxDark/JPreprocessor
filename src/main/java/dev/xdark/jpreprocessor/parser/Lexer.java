@@ -12,6 +12,8 @@ public interface Lexer {
 
     StringReader source();
 
+    void reset();
+
     default boolean accept(JavaTokenKind kind) {
         return current().kind() == kind;
     }
@@ -29,8 +31,13 @@ public interface Lexer {
         return current();
     }
 
-    default Token expectNext(JavaTokenKind kind) {
+    default Token nextExpect(JavaTokenKind kind) {
         consumeToken();
         return expect(kind);
+    }
+
+    default Token expectNext(JavaTokenKind kind) {
+        expect(kind);
+        return next();
     }
 }

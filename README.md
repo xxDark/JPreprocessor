@@ -5,26 +5,31 @@ This project is under heavy development, and might not get done at all.
 
 Syntax is subject to change, as I'm playing with this.
 
+# TODO:
+ - Separate types for directive types (identifier,string,etc)
+ - if/else
+
 # Example:
 
 ```java
-#define sout(v) System.out.println(v!);
-#define foo(v) Math.sin(v!)
-#define PI 3.14
+define! listOf(...) {
+    write("Arrays.asList(")
+    if (va_args.length) {
+        write(va_args[0])
+        for (var i = 1; i < va_args.length; i++) {
+            write(',')
+            write(va_args[i])
+        }
+    }
+    write(')')
+}
+define! sout(value) {
+    write("System.out.println(" + value + ");")
+}
 public class Test {
   public static void main(String[] args) {
-    sout!("Hello, World")
-    sout!(Math.cos(foo!(5), Math.sqrt(foo!(Math.pow(2, 2)))));
-    sout!(PI!);
+      sout!(listOf!(1,2,3,4)) // System.out.println(Arrays.asList(1,2,3,4))
   }
 }
 ```
-```java
-public class Test {
-  public static void main(String[] args) {
-     System.out.println("Hello, World");
-     System.out.println(Math.cos(Math.sin(5), Math.sqrt(Math.sin(Math.pow(2, 2)))));
-     System.out.println(3.14);
-  }
-}
-```
+

@@ -1,9 +1,6 @@
 package dev.xdark.jpreprocessor.parser;
 
-import java.util.Arrays;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 public enum JavaTokenKind implements TokenKind {
     EOF(),
@@ -20,8 +17,10 @@ public enum JavaTokenKind implements TokenKind {
     RBRACKET("]"),
     SEMI(";"),
     COMMA(","),
+    COLUMN(":"),
     DOT("."),
     SLASH("/"),
+    BACKSLASH("\\"),
     SLASHSLASH("//"),
     SLASHSTAR("/*"),
     STARSLASH("*/"),
@@ -31,16 +30,16 @@ public enum JavaTokenKind implements TokenKind {
     PLUS("+"),
     MINUS("-"),
     STAR("*"),
-    INT_VALUE(TokenKindTag.NUMERIC),
-    LONG_VALUE(TokenKindTag.NUMERIC),
-    FLOAT_VALUE(TokenKindTag.NUMERIC),
-    DOUBLE_VALUE(TokenKindTag.NUMERIC),
-    CHAR_VALU(TokenKindTag.NUMERIC),
-    TEXT_VALUE(TokenKindTag.STRING);
+    LT("<"),
+    GT(">"),
+    INT_VALUE(JavaTokenKindTag.NUMERIC),
+    LONG_VALUE(JavaTokenKindTag.NUMERIC),
+    FLOAT_VALUE(JavaTokenKindTag.NUMERIC),
+    DOUBLE_VALUE(JavaTokenKindTag.NUMERIC),
+    CHAR_VALUE(JavaTokenKindTag.NUMERIC),
+    TEXT_VALUE(JavaTokenKindTag.STRING);
 
-    private static final Map<String, JavaTokenKind> BY_NAME = Arrays.stream(values())
-            .filter(x -> x.content != null)
-            .collect(Collectors.toMap(JavaTokenKind::content, Function.identity()));
+    private static final Map<String, JavaTokenKind> BY_NAME = TokenKindHelper.collect();
     private final String content;
     private final TokenKindTag tag;
 
@@ -50,7 +49,7 @@ public enum JavaTokenKind implements TokenKind {
     }
 
     JavaTokenKind(String content) {
-        this(content, TokenKindTag.DEFAULT);
+        this(content, JavaTokenKindTag.DEFAULT);
     }
 
     JavaTokenKind(TokenKindTag tag) {

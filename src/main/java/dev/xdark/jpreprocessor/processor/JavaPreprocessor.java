@@ -3,48 +3,43 @@ package dev.xdark.jpreprocessor.processor;
 import dev.xdark.jpreprocessor.parser.*;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 public final class JavaPreprocessor {
 
     private JavaPreprocessor() {
     }
 
-    public static String process(CharSequence input) {
+    public static String process(PreprocessorEnvironment env, CharSequence input) {
         StringBuilder builder = new StringBuilder(input.length());
         try {
-            process(input, dumper(builder));
+            process(env, input, dumper(builder));
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
         return builder.toString();
     }
 
-    public static void process(CharSequence input, PreprocessorConsumer consumer) throws IOException {
-        PreprocessContext ctx = new PreprocessContext();
-        PreprocessorEnvironment.initBuiltins(ctx);
-        processImpl(ctx, StringReader.of(input), consumer);
+    public static void process(PreprocessorEnvironment env, CharSequence input, PreprocessorConsumer consumer) throws IOException {
+        process(env, StringReader.of(input), consumer);
     }
 
-    private static void processImpl(PreprocessContext ctx, StringReader reader, PreprocessorConsumer csm) throws IOException {
+    public static void process(PreprocessorEnvironment env, StringReader reader, PreprocessorConsumer csm) throws IOException {
         CharSequence text = reader.text();
-        Lexer lexer = newLexer(reader);
-        Token last = null;
+        Lexer lexer = SourceCodeHelper.newLexer(reader);
+        int prepend = 0;
         loop:
         while (true) {
             Token token = lexer.next();
-            int prepend = 0;
-            if (last != null) {
-                prepend = last.end();
+            int tokenStart = token.start();
+            if (prepend != -1 && tokenStart > prepend) {
+                csm.append(text, prepend, token.start());
             }
-            csm.append(text, prepend, token.start());
             TokenKind kind = token.kind();
             if (kind == JavaTokenKind.SLASHSLASH) {
                 reader.skipLine();
                 csm.append(text, token.start(), reader.position());
                 csm.append('\n');
-                last = null;
+                prepend = -1;
                 continue;
             } else if (kind == JavaTokenKind.SLASHSTAR) {
                 while (true) {
@@ -54,7 +49,7 @@ public final class JavaPreprocessor {
                         throw new IllegalStateException("Expected */");
                     }
                     if (kind == JavaTokenKind.STARSLASH) {
-                        last = tmp;
+                        prepend = tmp.end();
                         csm.append(text, token.start(), tmp.end());
                         continue loop;
                     }
@@ -63,22 +58,20 @@ public final class JavaPreprocessor {
                 Token next = lexer.token(1);
                 if (next.kind() == JavaTokenKind.EXCLAMATION) {
                     String directiveName = textify(lexer, token);
-                    MacroDirective directive = ctx.lookup(directiveName);
+                    MacroDirective directive = env.getDirective(directiveName);
                     if (directive == null) {
                         throw new IllegalStateException("Unknown directive " + directiveName);
                      }
                     lexer.consumeToken();
-                    if (directive.consume(ctx, lexer, csm)) {
+                    if (directive.consume(env, lexer, csm)) {
                         int start = next.end();
                         int end = reader.position();
-                        // TODO FIX ME: context should not be shared, and API should be
-                        // changed to store a bit more information
                         csm.macroSuffix(start, end, directive(directiveName, output -> {
                             StringReader slice = StringReader.of(text.subSequence(start, end));
-                            directive.expand(ctx, newLexer(slice), output);
+                            directive.expand(env, SourceCodeHelper.newLexer(slice), output);
                         }));
                     }
-                    last = lexer.current();
+                    prepend =lexer.current().end();
                     continue;
                 }
             }
@@ -86,16 +79,12 @@ public final class JavaPreprocessor {
             if (token.kind() == JavaTokenKind.EOF) {
                 break;
             }
-            last = token;
+            prepend = token.end();
         }
     }
 
     static String textify(Lexer lexer, Token token) {
         return lexer.source().text().subSequence(token.start(), token.end()).toString();
-    }
-
-    private static Lexer newLexer(StringReader source) {
-        return new DefaultLexer(new DefaultTokenizer(source, new BasicTokens()));
     }
 
     private static PreprocessorDirective directive(String name, Evaluate evaluate) {

@@ -4,18 +4,18 @@ import java.util.List;
 
 public final class DirectiveDefinition {
     private final List<String> arguments;
-    private final CodeRange range;
+    private final String code;
 
-    public DirectiveDefinition(List<String> arguments, CodeRange range) {
+    public DirectiveDefinition(List<String> arguments, String range) {
         this.arguments = arguments;
-        this.range = range;
+        this.code = range;
     }
 
     public List<String> getArguments() {
         return arguments;
     }
 
-    public CodeRange getRange() {
-        return range;
+    public String getCode() {
+        return code;
     }
 }
