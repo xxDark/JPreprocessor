@@ -13,15 +13,7 @@ Syntax is subject to change, as I'm playing with this.
 
 ```java
 define! listOf(...) {
-    write("Arrays.asList(")
-    if (va_args.length) {
-        write(va_args[0])
-        for (var i = 1; i < va_args.length; i++) {
-            write(',')
-            write(va_args[i])
-        }
-    }
-    write(')')
+    write(`Arrays.asList(${va_args.join(',')})`)
 }
 define! sout(value) {
     write(`System.out.println(${value});`)

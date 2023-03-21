@@ -2,12 +2,13 @@ package dev.xdark.jpreprocessor.processor;
 
 import dev.xdark.jpreprocessor.parser.Lexer;
 import dev.xdark.jpreprocessor.parser.StringReader;
-import org.mozilla.javascript.Context;
-import org.mozilla.javascript.ScriptableObject;
+import org.mozilla.javascript.*;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 final class UserDirective implements MacroDirective {
     private final DirectiveDefinition definition;
@@ -40,15 +41,19 @@ final class UserDirective implements MacroDirective {
                 boolean varargs = "...".equals(args.get(args.size() - 1));
                 if (varargs) {
                     List<Object> tail = values.subList(args.size() - 1, actualCount);
-                    List<Object> compact = new ArrayList<>(tail);
+                    Object[] array = tail.toArray();
                     tail.clear();
                     actualCount = args.size() - 1;
-                    ScriptableObject.putProperty(scope, "va_args", compact);
+                    ScriptableObject.putProperty(scope, "va_args", context.newArray(scope, array));
                 } else if (args.size() != actualCount) {
                     throw new IllegalStateException("Argument count mismatch");
                 }
                 for (int i = 0; i < actualCount; i++) {
-                    ScriptableObject.putProperty(scope, args.get(i), values.get(i));
+                    Object value = values.get(i);
+                    if (value instanceof List<?>) {
+                        value = context.newArray(scope, ((List<?>) value).toArray());
+                    }
+                    ScriptableObject.putProperty(scope, args.get(i), value);
                 }
             }
             context.evaluateString(scope, code, null, 0, null);
