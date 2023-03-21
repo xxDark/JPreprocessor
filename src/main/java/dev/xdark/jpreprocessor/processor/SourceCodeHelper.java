@@ -27,53 +27,7 @@ public final class SourceCodeHelper {
         }
     }
 
-    public static void consumeDirectiveDefinition(Lexer lexer) {
-        Token token = lexer.current();
-        TokenKind kind = token.kind();
-        if (kind != JavaTokenKind.LPAREN) {
-            throw new IllegalStateException("Expected (");
-        }
-        while (true) {
-            token = lexer.next();
-            kind = token.kind();
-            if (kind != JavaTokenKind.RPAREN) {
-                if (kind == JavaTokenKind.EOF) {
-                    throw new IllegalStateException("Unexpected EOF");
-                }
-                token = lexer.token(1);
-                if (token.kind() == JavaTokenKind.COMMA) {
-                    lexer.consumeToken();
-                }
-                continue;
-            }
-            break;
-        }
-        // We need to look ahead here to avoid confusion when silently changing
-        // last token in JavaPreprocessor
-        token = lexer.token(1);
-        kind = token.kind();
-        if (kind == JavaTokenKind.LBRACE) {
-            lexer.consumeToken();
-            int depth = 1;
-            while (true) {
-                token = lexer.next();
-                kind = token.kind();
-                if (kind == JavaTokenKind.EOF) {
-                    throw new IllegalStateException("Unexpected EOF");
-                }
-                if (kind == JavaTokenKind.LBRACE) {
-                    depth++;
-                } else if (kind == JavaTokenKind.RBRACE) {
-                    if (--depth == 0) {
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    public static DirectiveDefinition getDirectiveDefinition(Lexer lexer) {
-        List<String> args = getArgumentNames(lexer);
+    public static String getDirectiveBody(Lexer lexer) {
         StringReader reader = lexer.source();
         Token token = lexer.next();
         TokenKind kind = token.kind();
@@ -99,9 +53,15 @@ public final class SourceCodeHelper {
         } else {
             throw new IllegalStateException("Unexpected token " + kind);
         }
+        return reader.text().subSequence(codeStart, codeEnd).toString();
+    }
+
+    public static DirectiveDefinition getDirectiveDefinition(Lexer lexer) {
+        List<String> args = getArgumentNames(lexer);
+        String code = getDirectiveBody(lexer);
         return new DirectiveDefinition(
                 args,
-                reader.text().subSequence(codeStart, codeEnd).toString()
+                code
         );
     }
 

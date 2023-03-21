@@ -54,6 +54,7 @@ public final class BasicPreprocessorEnvironment implements PreprocessorEnvironme
         map.put("puts", new PutsDirective());
         map.put("undefine", new UndefineDirective());
         map.put("include", new IncludeDirective());
+        map.put("exec", new ExecDirective());
         return map;
     }
 }
