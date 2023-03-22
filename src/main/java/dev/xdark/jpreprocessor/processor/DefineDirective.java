@@ -27,7 +27,7 @@ final class DefineDirective implements MacroDirective {
         lexer.consumeToken();
         DirectiveDefinition definition = SourceCodeHelper.getDirectiveDefinition(lexer);
         csm.definition(start, lexer.source().position());
-        env.setDirective(name, new UserDirective(definition));
+        env.setDirective(name, new UserDirective(name, definition));
         return false;
     }
 }

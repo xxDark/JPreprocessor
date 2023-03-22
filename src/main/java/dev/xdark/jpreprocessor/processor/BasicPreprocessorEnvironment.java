@@ -1,5 +1,6 @@
 package dev.xdark.jpreprocessor.processor;
 
+import java.io.IOException;
 import java.io.Reader;
 import java.util.Collections;
 import java.util.HashMap;
@@ -19,7 +20,7 @@ public final class BasicPreprocessorEnvironment implements PreprocessorEnvironme
     }
 
     @Override
-    public Reader findInclude(String fileName) {
+    public Reader findInclude(String fileName) throws IOException {
         return includeDiscoverer.findInclude(fileName);
     }
 

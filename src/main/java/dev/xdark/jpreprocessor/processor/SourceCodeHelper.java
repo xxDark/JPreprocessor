@@ -31,7 +31,7 @@ public final class SourceCodeHelper {
         StringReader reader = lexer.source();
         Token token = lexer.next();
         TokenKind kind = token.kind();
-        int codeStart = lexer.token(1).start();
+        int codeStart = token.end();
         int codeEnd;
         if (kind == JavaTokenKind.LBRACE) {
             int depth = 1;

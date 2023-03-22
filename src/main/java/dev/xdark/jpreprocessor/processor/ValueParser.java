@@ -37,7 +37,7 @@ public final class ValueParser {
             throw new IllegalStateException("Unhandled numeric kind: " + kind);
         }
         if (token instanceof TextToken) {
-            return '"' + ((TextToken) token).text() + '"';
+            return ((TextToken) token).text();
         }
         if (kind == JavaTokenKind.LBRACKET) {
             return parseArray(lexer);

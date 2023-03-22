@@ -13,8 +13,8 @@ final class IncludeDirective implements MacroDirective {
     @Override
     public void expand(PreprocessorEnvironment env, Lexer lexer, Appendable output) throws IOException {
         lexer.consumeToken();
-        Token identifier = lexer.expectNext(JavaTokenKind.TEXT_VALUE);
-        lexer.expect(JavaTokenKind.IDENTIFIER);
+        Token identifier = lexer.expectNext(JavaTokenKind.LPAREN);
+        lexer.expect(JavaTokenKind.TEXT_VALUE);
         lexer.nextExpect(JavaTokenKind.RPAREN);
         String path = ((TextToken) identifier).text();
         Reader reader = env.findInclude(path);
@@ -22,16 +22,18 @@ final class IncludeDirective implements MacroDirective {
             throw new IllegalStateException("Could not find include file " + path);
         }
         char[] buf = new char[512];
-        CharArraySequence cs = new CharArraySequence(buf, 0);
+        StringBuilder builder = new StringBuilder();
         try {
             int r;
             while ((r = reader.read(buf)) != -1) {
-                cs.len = r;
-                output.append(cs);
+                builder.append(buf, 0, r);
             }
         } finally {
             reader.close();
         }
+        String code = builder.toString();
+        code = JavaPreprocessor.process(env, code);
+        output.append(code);
     }
 
     @Override
