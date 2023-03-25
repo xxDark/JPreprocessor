@@ -1,0 +1,23 @@
+dependencies {
+    implementation project(':jpreprocessor-core')
+    implementation rhino
+}
+
+/*
+tasks.withType(JavaCompile).configureEach {
+    def options = it.options.compilerArgs
+    [
+            'com.sun.source.util',
+            'com.sun.tools.javac.api',
+            'com.sun.tools.javac.main',
+            'com.sun.tools.javac.util',
+            'com.sun.tools.javac.parser'
+    ].each {
+        options.add("--add-exports=jdk.compiler/$it=ALL-UNNAMED")
+    }
+}
+*/
+
+jar {
+    from { configurations.shade.collect { zipTree(it) } }
+}

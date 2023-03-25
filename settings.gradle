@@ -1,0 +1,5 @@
+rootProject.name = 'jpreprocessor'
+include 'jpreprocessor-core'
+include 'jpreprocessor-gradle'
+include 'jpreprocessor-javac'
+

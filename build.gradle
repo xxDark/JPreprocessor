@@ -1,0 +1,24 @@
+allprojects {
+    group = 'dev.xdark'
+    version = '1.0'
+}
+
+subprojects {
+    apply plugin: 'java'
+
+    repositories {
+        mavenCentral()
+    }
+
+    configurations {
+        shade
+        implementation.extendsFrom shade
+    }
+
+    ext {
+        rhino = 'org.mozilla:rhino:1.7.14'
+    }
+
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
+}

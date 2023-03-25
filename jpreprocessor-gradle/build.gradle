@@ -1,0 +1,21 @@
+plugins {
+    id 'java-gradle-plugin'
+}
+
+dependencies {
+    shade project(':jpreprocessor-core')
+    shade rhino
+}
+
+jar {
+    from { configurations.shade.collect { zipTree(it) } }
+}
+
+gradlePlugin {
+    plugins {
+        jpreprocessor {
+            id = 'dev.xdark.jpreprocessor'
+            implementationClass = 'dev.xdark.jpreprocessor.gradle.GradlePlugin'
+        }
+    }
+}
