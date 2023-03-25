@@ -27,7 +27,6 @@ public final class JavaPreprocessor {
         CharSequence text = reader.text();
         Lexer lexer = SourceCodeHelper.newLexer(reader);
         int prepend = 0;
-        loop:
         while (true) {
             Token token = lexer.next();
             int tokenStart = token.start();
@@ -35,38 +34,31 @@ public final class JavaPreprocessor {
                 csm.append(text, prepend, token.start());
             }
             TokenKind kind = token.kind();
+            handle:
             if (kind == JavaTokenKind.SLASHSLASH) {
                 reader.skipLine();
                 csm.append(text, token.start(), reader.position());
                 csm.append('\n');
                 prepend = -1;
                 continue;
-            } else if (kind == JavaTokenKind.SLASHSTAR) {
-                while (true) {
-                    Token tmp = lexer.next();
-                    kind = tmp.kind();
-                    if (kind == JavaTokenKind.EOF) {
-                        throw new IllegalStateException("Expected */");
-                    }
-                    if (kind == JavaTokenKind.STARSLASH) {
-                        prepend = tmp.end();
-                        csm.append(text, token.start(), tmp.end());
-                        continue loop;
-                    }
-                }
             } else if (kind == JavaTokenKind.IDENTIFIER) {
                 Token next = lexer.token(1);
-                if (next.kind() == JavaTokenKind.EXCLAMATION) {
+                // TODO see comment below
+                if (next.kind() == JavaTokenKind.EXCLAMATION && next.start() == token.end()) {
                     String directiveName = textify(lexer, token);
                     MacroDirective directive = env.getDirective(directiveName);
                     if (directive == null) {
-                        throw new IllegalStateException("Unknown directive " + directiveName);
+                        break handle;
+                        // TODO: maybe all directive should have ()?...
+                        // There is a corner case like this one:
+                        // if (a != null) - a is a directive call?
+                        //throw new IllegalStateException("Unknown directive " + directiveName);
                      }
                     lexer.consumeToken();
                     if (directive.consume(env, lexer, csm)) {
                         int start = next.end();
                         int end = reader.position();
-                        csm.macroSuffix(start, end, directive(directiveName, output -> {
+                        csm.directiveCall(start, end, directive(directiveName, output -> {
                             StringReader slice = StringReader.of(text.subSequence(start, end));
                             directive.expand(env, SourceCodeHelper.newLexer(slice), output);
                         }));
@@ -109,16 +101,7 @@ public final class JavaPreprocessor {
             }
 
             @Override
-            public void macroPrefix(int start, int end, PreprocessorDirective result) {
-                try {
-                    result.evaluate(sb);
-                } catch (IOException ex) {
-                    throw new RuntimeException(ex);
-                }
-            }
-
-            @Override
-            public void macroSuffix(int start, int end, PreprocessorDirective result) {
+            public void directiveCall(int start, int end, PreprocessorDirective result) {
                 try {
                     result.evaluate(sb);
                 } catch (IOException ex) {

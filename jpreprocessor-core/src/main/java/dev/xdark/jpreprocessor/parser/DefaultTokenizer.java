@@ -180,8 +180,21 @@ public final class DefaultTokenizer implements Tokenizer {
                         append("//");
                         tk = JavaTokenKind.SLASHSLASH;
                     } else if (reader.accept("/*")) {
-                        append("/*");
-                        tk = JavaTokenKind.SLASHSTAR;
+                        boolean isEmpty = reader.accept('*') && reader.is('/');
+                        if (!isEmpty) {
+                            while (reader.canRead()) {
+                                if (reader.accept('*') && reader.is('/')) {
+                                    break;
+                                } else {
+                                    reader.next();
+                                }
+                            }
+                        }
+                        if (reader.accept('/')) {
+                            tk = JavaTokenKind.COMMENT;
+                        } else {
+                            throw new IllegalStateException("Unclosed comment");
+                        }
                     } else {
                         reader.next();
                         tk = JavaTokenKind.SLASH;
@@ -230,12 +243,6 @@ public final class DefaultTokenizer implements Tokenizer {
                     reader.next();
                     tk = JavaTokenKind.BACKQUOTE;
                     break loop;
-                case '*':
-                    if (reader.accept("*/")) {
-                        append("*/");
-                        tk = JavaTokenKind.STARSLASH;
-                        break loop;
-                    }
             }
             if (isSpecial(reader.get())) {
                 scanOperator();
@@ -649,11 +656,6 @@ public final class DefaultTokenizer implements Tokenizer {
                 tk = JavaTokenKind.INT_VALUE;
             }
         }
-    }
-
-    private void skipLineTerminator() {
-        reader.accept('\r');
-        reader.accept('\n');
     }
 
     private void scanLitChar() {

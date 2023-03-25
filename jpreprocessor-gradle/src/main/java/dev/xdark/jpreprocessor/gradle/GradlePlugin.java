@@ -2,42 +2,31 @@ package dev.xdark.jpreprocessor.gradle;
 
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
-import org.gradle.api.model.ObjectFactory;
+import org.gradle.api.file.FileCollection;
 import org.gradle.api.tasks.TaskContainer;
+import org.gradle.api.tasks.compile.CompileOptions;
 import org.gradle.api.tasks.compile.JavaCompile;
-import org.gradle.jvm.toolchain.JavaInstallationMetadata;
-import org.gradle.jvm.toolchain.JavaLanguageVersion;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.File;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.List;
 
 public final class GradlePlugin implements Plugin<Project> {
 
     @Override
     public void apply(@NotNull Project project) {
-        // TODO
-        JPreprocessorExtension extension = project.getExtensions().create("jpreprocessor", JPreprocessorExtension.class);
         TaskContainer tasks = project.getTasks();
-        String path = String.format("\"%s\"", getPathToPluginJar());
+        File pluginFile = getPathToPluginJar().toFile();
         for (JavaCompile task : tasks.withType(JavaCompile.class)) {
             task.doFirst("JPreprocessor inject", __ -> {
-                JavaInstallationMetadata metadata = task.getJavaCompiler().get().getMetadata();
-                JavaLanguageVersion version = metadata.getLanguageVersion();
-                String option;
-                if (version.compareTo(JavaLanguageVersion.of(8)) > 0) {
-                    option = "--processor-path";
-                } else {
-                    option = "-processorpath";
+                CompileOptions options = task.getOptions();
+                FileCollection fc = options.getAnnotationProcessorPath();
+                if (fc != null) {
+                    options.setAnnotationProcessorPath(fc.plus(project.files(pluginFile)));
+                    task.getOptions().getCompilerArgs().add("-Xplugin:JPreprocessor");
                 }
-                List<String> args = task.getOptions().getCompilerArgs();
-                args.addAll(
-                        Arrays.asList(option, path)
-                );
-                args.add("-Xplugin:JPreprocessor");
             });
         }
     }

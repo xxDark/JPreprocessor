@@ -5,6 +5,7 @@ allprojects {
 
 subprojects {
     apply plugin: 'java'
+    apply plugin: 'maven-publish'
 
     repositories {
         mavenCentral()
@@ -21,4 +22,15 @@ subprojects {
 
     sourceCompatibility = 1.8
     targetCompatibility = 1.8
+
+    publishing {
+        repositories {
+            mavenLocal()
+        }
+        publications {
+            maven(MavenPublication) {
+                from components.java
+            }
+        }
+    }
 }

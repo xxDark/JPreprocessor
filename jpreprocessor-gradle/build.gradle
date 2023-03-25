@@ -3,6 +3,7 @@ plugins {
 }
 
 dependencies {
+    shade project(':jpreprocessor-javac')
     shade project(':jpreprocessor-core')
     shade rhino
 }
