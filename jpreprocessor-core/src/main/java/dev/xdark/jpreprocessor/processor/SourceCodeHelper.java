@@ -121,6 +121,9 @@ public final class SourceCodeHelper {
         while (true) {
             token = lexer.next();
             kind = token.kind();
+            if (kind == JavaTokenKind.EOF) {
+                throw new IllegalStateException("Unexpected EOF");
+            }
             if (kind == JavaTokenKind.COMMA && depth == 1) {
                 args.add(builder.toString());
                 builder.setLength(0);

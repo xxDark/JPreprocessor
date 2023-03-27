@@ -58,7 +58,8 @@ public final class JavaPreprocessor {
                     if (directive.consume(env, lexer, csm)) {
                         int start = next.end();
                         int end = reader.position();
-                        csm.directiveCall(start, end, directive(directiveName, output -> {
+                        // For the user, we provide the whole expression
+                        csm.directiveCall(tokenStart, end, directive(directiveName, output -> {
                             StringReader slice = StringReader.of(text.subSequence(start, end));
                             directive.expand(env, SourceCodeHelper.newLexer(slice), output);
                         }));
