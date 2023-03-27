@@ -69,7 +69,6 @@ final class PreprocessorLexer extends Lexer {
         if (end != null) {
             return end;
         }
-        // See comment above on why we are retrying
         return delegate.getTokenEnd();
     }
 
